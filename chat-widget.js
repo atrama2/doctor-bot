@@ -157,7 +157,7 @@
                             <label class="form-check-label" for="languageSwitch">TH</label>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2g</small>
+                    <small class="text-muted">v0.0.2h</small>
                 </div>
             </div>
         `;
@@ -177,6 +177,7 @@
         let isInErrorState = false;
         let lastInputWasSpeech = false;
         let conversationHistory = [];
+        let isWaitingForAPI = false;
 
         const synth = window.speechSynthesis;
 
@@ -249,7 +250,7 @@
 
         function handleSpeechEnd() {
             stopRecording();
-            if (!isSpeaking && !isInErrorState) {
+            if (!isSpeaking && !isInErrorState && !isWaitingForAPI) {
                 setTimeout(startRecording, 1000);
             }
         }
@@ -267,9 +268,9 @@
             utterance.onend = () => {
                 isSpeaking = false;
                 stopTTSButton.style.display = 'none';
-                if (!isInErrorState) {
+                if (!isInErrorState && !isWaitingForAPI) {
                     setTimeout(() => {
-                        if (!isRecording && !isSpeaking) {
+                        if (!isRecording && !isSpeaking && !isWaitingForAPI) {
                             startRecording();
                         }
                     }, 1000);
@@ -284,7 +285,7 @@
                 synth.cancel();
                 isSpeaking = false;
                 stopTTSButton.style.display = 'none';
-                if (!isInErrorState) {
+                if (!isInErrorState && !isWaitingForAPI) {
                     setTimeout(startRecording, 1000);
                 }
             }
@@ -359,6 +360,7 @@
                 chatInput.value = '';
                 
                 showTypingIndicator();
+                isWaitingForAPI = true;
                 
                 try {
                     const botReply = await sendMessageToAPI(message);
@@ -380,6 +382,8 @@
                     console.error('Error:', error);
                     removeTypingIndicator();
                     addMessage('bot', 'Sorry, I encountered an error. Please try again.');
+                } finally {
+                    isWaitingForAPI = false;
                 }
             }
         }
