@@ -174,6 +174,9 @@
 
     recognition.onend = function() {
         stopRecording();
+        if (chatInput.value.trim()) {
+            chatForm.dispatchEvent(new Event('submit'));
+        }
     };
 
     chatForm.addEventListener('submit', async function(e) {
