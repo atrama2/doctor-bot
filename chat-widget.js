@@ -28,20 +28,31 @@
             border-radius: 0.25rem;
             display: flex;
             flex-direction: column;
+            font-family: Arial, sans-serif;
         }
         .chat-messages {
             flex-grow: 1;
             overflow-y: auto;
             padding: 1rem;
+            display: flex;
+            flex-direction: column;
         }
         .chat-message {
+            max-width: 80%;
+            padding: 0.5rem 1rem;
             margin-bottom: 0.5rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
         }
         .chat-message.user {
-            text-align: right;
+            align-self: flex-end;
+            background-color: #007bff;
+            color: white;
         }
         .chat-message.bot {
-            text-align: left;
+            align-self: flex-start;
+            background-color: #f1f3f5;
+            color: black;
         }
         .chat-form {
             padding: 1rem;
@@ -52,9 +63,11 @@
             padding: 0.5rem 1rem;
             background-color: #f8f9fa;
             border-top: 1px solid #dee2e6;
+            font-size: 0.8rem;
         }
         .form-check-input {
-            width: 3em;
+            width: 2.5em;
+            height: 1.25em;
         }
         .form-check-input:checked {
             background-color: #0d6efd;
@@ -64,6 +77,8 @@
             background-color: transparent;
             border: none;
             font-size: 1.2rem;
+            color: #6c757d;
+            transition: color 0.2s;
         }
         .mic-button:hover {
             color: #0d6efd;
@@ -73,15 +88,16 @@
         }
         .typing-indicator {
             display: flex;
-            justify-content: flex-start;
-            align-items: center;
+            padding: 0.5rem;
+            background-color: #f1f3f5;
+            border-radius: 1rem;
+            align-self: flex-start;
         }
         .typing-indicator span {
-            height: 10px;
-            width: 10px;
-            float: left;
+            height: 0.5rem;
+            width: 0.5rem;
             margin: 0 1px;
-            background-color: #9E9EA1;
+            background-color: #6c757d;
             display: block;
             border-radius: 50%;
             opacity: 0.4;
@@ -89,18 +105,22 @@
         }
         @keyframes typing {
             0% { transform: translateY(0px); }
-            28% { transform: translateY(-7px); }
+            28% { transform: translateY(-5px); }
             44% { transform: translateY(0px); }
         }
         .typing-indicator span:nth-of-type(2) { animation-delay: 0.2s; }
         .typing-indicator span:nth-of-type(3) { animation-delay: 0.4s; }
+        .stop-tts-button {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
     `;
     document.head.appendChild(style);
 
     // Create chat HTML
     const chatHTML = `
-    <div class="chat-container shadow d-flex flex-column">
-        <div class="chat-messages flex-grow-1"></div>
+    <div class="chat-container shadow">
+        <div class="chat-messages"></div>
         <form class="chat-form">
             <div class="input-group">
                 <button class="btn btn-outline-secondary mic-button" type="button">
@@ -110,7 +130,7 @@
                 <button class="btn btn-primary" type="submit">Send</button>
             </div>
         </form>
-        <div class="chat-footer d-flex justify-content-between align-items-center mt-2">
+        <div class="chat-footer d-flex justify-content-between align-items-center">
             <button class="btn btn-sm btn-danger stop-tts-button" style="display: none;">Stop Speech</button>
             <div class="d-flex align-items-center">
                 <span class="me-2">EN</span>
@@ -119,7 +139,7 @@
                     <label class="form-check-label" for="languageSwitch">TH</label>
                 </div>
             </div>
-            <small class="text-muted">v0.0.2c</small>
+            <small class="text-muted">v0.0.2d</small>
         </div>
     </div>
     `;
