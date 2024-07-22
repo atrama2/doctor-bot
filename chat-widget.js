@@ -90,7 +90,7 @@
                     <label class="form-check-label" for="languageSwitch">TH</label>
                 </div>
             </div>
-            <small class="text-muted">v0.0.1a</small>
+            <small class="text-muted">v0.0.1b</small>
         </div>
     </div>
 `;
@@ -139,6 +139,7 @@
 
     let isRecording = false;
     let isAndroid = /Android/i.test(navigator.userAgent);
+    let recognitionTimeout;
 
     micButton.addEventListener('click', toggleSpeechRecognition);
 
@@ -242,9 +243,22 @@
             isRecording = true;
             lastInputWasSpeech = true;
             micButton.classList.add('recording');
-            recognition.start();
+            
+            // Clear any existing timeout
+            if (recognitionTimeout) {
+                clearTimeout(recognitionTimeout);
+            }
+            
+            // Set a longer timeout for Thai language on Android
+            if (isAndroid && currentLanguage === 'th-TH') {
+                recognitionTimeout = setTimeout(() => {
+                    recognition.start();
+                }, 1000); // 1 second delay for Thai
+            } else {
+                recognition.start();
+            }
         }
-    }       
+    }     
 
     function stopRecording() {
         if (isRecording) {
@@ -297,15 +311,21 @@
         if (chatInput.value.trim()) {
             chatForm.dispatchEvent(new Event('submit'));
         } else if (!isSpeaking && !isInErrorState) {
-            setTimeout(() => {
-                if (!isRecording && !isSpeaking && !isAndroid) {
-                    startRecording();
-                } else if (!isRecording && !isSpeaking && isAndroid) {
-                    setTimeout(startRecording, 5000);  // Adding a delay before restarting recognition for Android
-                }
-            }, 1000);  // Adding a delay before restarting recognition for non-Android
+            if (isAndroid && currentLanguage === 'th-TH') {
+                setTimeout(() => {
+                    if (!isRecording && !isSpeaking) {
+                        startRecording();
+                    }
+                }, 2000); // 2 second delay before restarting for Thai on Android
+            } else {
+                setTimeout(() => {
+                    if (!isRecording && !isSpeaking) {
+                        startRecording();
+                    }
+                }, 1000); // 1 second delay for other cases
+            }
         }
-    };    
+    };  
 
     micButton.addEventListener('click', () => {
         if (isRecording) {
@@ -331,7 +351,6 @@
                 removeTypingIndicator();
                 addMessage('bot', botReply);
                 
-                // Add the bot's reply to the conversation history
                 conversationHistory.push({
                     role: "assistant",
                     content: botReply
@@ -349,6 +368,11 @@
                 console.error('Error:', error);
                 removeTypingIndicator();
                 addMessage('bot', 'Sorry, I encountered an error. Please try again.');
+            }
+        } else {
+            // If the message is empty, restart recording
+            if (lastInputWasSpeech) {
+                startRecording();
             }
         }
     });
