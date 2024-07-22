@@ -24,7 +24,8 @@
         loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css', 'css'),
         loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', 'js'),
         loadExternalResource('https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js', 'js'),
-        loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css', 'css')
+        loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css', 'css'),
+        loadExternalResource('https://cdnjs.cloudflare.com/ajax/libs/annyang/2.6.1/annyang.min.js', 'js')
     ]).then(() => {
         initializeChat();
     }).catch(error => {
@@ -156,7 +157,7 @@
                             <label class="form-check-label" for="languageSwitch">TH</label>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2f</small>
+                    <small class="text-muted">v0.0.2g</small>
                 </div>
             </div>
         `;
@@ -177,24 +178,25 @@
         let lastInputWasSpeech = false;
         let conversationHistory = [];
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.lang = currentLanguage;
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
         const synth = window.speechSynthesis;
+
+        // Initialize annyang
+        if (annyang) {
+            annyang.addCallback('result', handleSpeechResult);
+            annyang.addCallback('errorNetwork', handleSpeechError);
+            annyang.addCallback('errorPermissionBlocked', handleSpeechError);
+            annyang.addCallback('errorPermissionDenied', handleSpeechError);
+            annyang.addCallback('end', handleSpeechEnd);
+        } else {
+            console.error('Speech recognition is not supported in this browser.');
+            micButton.style.display = 'none';
+        }
 
         // Event listeners
         micButton.addEventListener('click', toggleSpeechRecognition);
         languageSwitch.addEventListener('change', updateLanguage);
         stopTTSButton.addEventListener('click', stopSpeech);
         chatForm.addEventListener('submit', handleFormSubmit);
-
-        recognition.onresult = handleSpeechResult;
-        recognition.onerror = handleSpeechError;
-        recognition.onend = handleSpeechEnd;
 
         updateLanguage();
 
@@ -209,29 +211,31 @@
         }
 
         function startRecording() {
-            if (!isRecording && !isSpeaking && !isInErrorState) {
+            if (!isRecording && !isSpeaking && !isInErrorState && annyang) {
                 isRecording = true;
                 lastInputWasSpeech = true;
                 micButton.classList.add('recording');
-                recognition.start();
+                annyang.start({ autoRestart: false, continuous: false });
             }
         }
 
         function stopRecording() {
-            if (isRecording) {
+            if (isRecording && annyang) {
                 isRecording = false;
                 micButton.classList.remove('recording');
-                recognition.stop();
+                annyang.abort();
             }
         }
 
-        function handleSpeechResult(event) {
-            const transcript = event.results[0][0].transcript;
-            chatInput.value = transcript;
+        function handleSpeechResult(phrases) {
+            if (phrases.length > 0) {
+                chatInput.value = phrases[0];
+                handleFormSubmit(new Event('submit'));
+            }
         }
 
-        function handleSpeechError(event) {
-            console.error('Speech recognition error:', event.error);
+        function handleSpeechError() {
+            console.error('Speech recognition error');
             stopRecording();
             isInErrorState = true;
             
@@ -245,9 +249,7 @@
 
         function handleSpeechEnd() {
             stopRecording();
-            if (chatInput.value.trim()) {
-                chatForm.dispatchEvent(new Event('submit'));
-            } else if (!isSpeaking && !isInErrorState) {
+            if (!isSpeaking && !isInErrorState) {
                 setTimeout(startRecording, 1000);
             }
         }
@@ -291,7 +293,9 @@
         // UI update functions
         function updateLanguage() {
             currentLanguage = languageSwitch.checked ? 'th-TH' : 'en-US';
-            recognition.lang = currentLanguage;
+            if (annyang) {
+                annyang.setLanguage(currentLanguage);
+            }
             chatInput.placeholder = currentLanguage === 'en-US' ? 'Type a message...' : 'พิมพ์ข้อความ...';
             container.querySelector('.chat-form button[type="submit"]').textContent = 
                 currentLanguage === 'en-US' ? 'Send' : 'ส่ง';
