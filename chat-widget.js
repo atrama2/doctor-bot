@@ -145,10 +145,30 @@
     // Add this near the top of the script, after the SpeechRecognition setup
     const synth = window.speechSynthesis;
     let lastInputWasSpeech = false;
+    let isSpeaking = false;
+    // Add this with other state variables
+    let isInErrorState = false;
 
-    // Add this function to handle text-to-speech
+    // Modify the speakText function
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
+        
+        utterance.onstart = () => {
+            isSpeaking = true;
+        };
+        
+        utterance.onend = () => {
+            isSpeaking = false;
+            // Only start recording if not in error state
+            if (!isInErrorState) {
+                setTimeout(() => {
+                    if (!isRecording && !isSpeaking) {
+                        startRecording();
+                    }
+                }, 1000);
+            }
+        };
+        
         synth.speak(utterance);
     }
 
@@ -162,15 +182,20 @@
     }
 
     function startRecording() {
-        isRecording = true;
-        micButton.classList.add('recording');
-        recognition.start();
-    }
+        if (!isRecording && !isSpeaking && !isInErrorState) {
+            isRecording = true;
+            lastInputWasSpeech = true;
+            micButton.classList.add('recording');
+            recognition.start();
+        }
+    }    
 
     function stopRecording() {
-        isRecording = false;
-        micButton.classList.remove('recording');
-        recognition.stop();
+        if (isRecording) {
+            isRecording = false;
+            micButton.classList.remove('recording');
+            recognition.stop();
+        }
     }
 
     recognition.onresult = function(event) {
@@ -181,14 +206,31 @@
     recognition.onerror = function(event) {
         console.error('Speech recognition error:', event.error);
         stopRecording();
+        isInErrorState = true;
+        
+        addMessage('bot', 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.');
+        
+        lastInputWasSpeech = false;
     };
 
     recognition.onend = function() {
         stopRecording();
         if (chatInput.value.trim()) {
             chatForm.dispatchEvent(new Event('submit'));
+        } else if (!isSpeaking && !isInErrorState) {
+            // Only start recording again if not in error state
+            setTimeout(startRecording, 1000);
         }
     };
+
+    micButton.addEventListener('click', () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            isInErrorState = false;  // Reset error state when manually starting
+            startRecording();
+        }
+    });
 
     chatForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -205,9 +247,10 @@
                 removeTypingIndicator();
                 addMessage('bot', botReply);
                 
-                // If the last input was speech, speak the response
                 if (lastInputWasSpeech) {
                     speakText(botReply);
+                } else {
+                    // If it wasn't speech input, reset lastInputWasSpeech
                     lastInputWasSpeech = false;
                 }
             } catch (error) {
