@@ -294,6 +294,12 @@
                 removeTypingIndicator();
                 addMessage('bot', botReply);
                 
+                // Add the bot's reply to the conversation history
+                conversationHistory.push({
+                    role: "assistant",
+                    content: botReply
+                });
+    
                 if (lastInputWasSpeech) {
                     if (synth.speaking) {
                         synth.cancel();
@@ -310,22 +316,31 @@
         }
     });
 
+    // Add this variable to store conversation history
+    let conversationHistory = [];
+
     // Modify the sendMessageToAPI function
     async function sendMessageToAPI(message) {
         const apiUrl = 'https://api.eidy.cloud/v1/chat/completions';
         const bearerToken = 'float16-gyZvmO6wlR9IbVSmcK6ol57x8dflOpHZ9v0ssboRZZmJ3R8Bud';
-
+    
+        // Add the new user message to the conversation history
+        conversationHistory.push({
+            role: "user",
+            content: message
+        });
+    
+        // Prepare the messages array for the API request
+        const messages = [...conversationHistory];
+    
         const data = {
-            messages: [{
-                role: "user",
-                content: message
-            }],
+            messages: messages,
             model: "eidy",
             max_tokens: 1024,
             temperature: 0.1,
             stream: false
         };
-
+    
         const config = {
             headers: {
                 'Authorization': `Bearer ${bearerToken}`,
@@ -333,7 +348,7 @@
                 'Accept-Language': currentLanguage.split('-')[0] // 'en' or 'th'
             }
         };
-
+    
         return axios.post(apiUrl, data, config);
     }
 
