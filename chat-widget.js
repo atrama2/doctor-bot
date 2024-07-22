@@ -1,24 +1,20 @@
 (function() {
-    // Include Bootstrap CSS
-    const bootstrapCSS = document.createElement('link');
-    bootstrapCSS.rel = 'stylesheet';
-    bootstrapCSS.href = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css';
-    document.head.appendChild(bootstrapCSS);
+    // Include external resources
+    const resources = [
+        { type: 'link', rel: 'stylesheet', href: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' },
+        { type: 'link', rel: 'stylesheet', href: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css' },
+        { type: 'script', src: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js' },
+        { type: 'script', src: 'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js' }
+    ];
 
-    // Include Bootstrap JS
-    const bootstrapJS = document.createElement('script');
-    bootstrapJS.src = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js';
-    document.body.appendChild(bootstrapJS);
+    resources.forEach(resource => {
+        const element = document.createElement(resource.type === 'link' ? 'link' : 'script');
+        Object.assign(element, resource);
+        (resource.type === 'link' ? document.head : document.body).appendChild(element);
+    });
 
-    // Include Axios
-    const axiosScript = document.createElement('script');
-    axiosScript.src = 'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js';
-    document.body.appendChild(axiosScript);
-
-    // Find the container
+    // Find the container and get custom dimensions
     const container = document.getElementById('embedded-chat');
-    
-    // Get custom dimensions from data attributes
     const width = container.dataset.width || '300px';
     const height = container.dataset.height || '400px';
 
@@ -64,7 +60,40 @@
             background-color: #0d6efd;
             border-color: #0d6efd;
         }
-        /* ... (rest of the existing styles) */
+        .mic-button {
+            background-color: transparent;
+            border: none;
+            font-size: 1.2rem;
+        }
+        .mic-button:hover {
+            color: #0d6efd;
+        }
+        .mic-button.recording {
+            color: #dc3545;
+        }
+        .typing-indicator {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+        }
+        .typing-indicator span {
+            height: 10px;
+            width: 10px;
+            float: left;
+            margin: 0 1px;
+            background-color: #9E9EA1;
+            display: block;
+            border-radius: 50%;
+            opacity: 0.4;
+            animation: typing 1s infinite;
+        }
+        @keyframes typing {
+            0% { transform: translateY(0px); }
+            28% { transform: translateY(-7px); }
+            44% { transform: translateY(0px); }
+        }
+        .typing-indicator span:nth-of-type(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-of-type(3) { animation-delay: 0.4s; }
     `;
     document.head.appendChild(style);
 
@@ -93,92 +122,78 @@
             <small class="text-muted">v0.0.2b</small>
         </div>
     </div>
-`;
+    `;
 
     // Inject the chat HTML
     container.innerHTML = chatHTML;
 
-    // Chat functionality
+    // Chat elements
     const chatMessages = container.querySelector('.chat-messages');
     const chatForm = container.querySelector('.chat-form');
     const chatInput = container.querySelector('.chat-input');
     const micButton = container.querySelector('.mic-button');
-
-    // Add Bootstrap Icons CSS
-    const bootstrapIcons = document.createElement('link');
-    bootstrapIcons.rel = 'stylesheet';
-    bootstrapIcons.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css';
-    document.head.appendChild(bootstrapIcons);
-
-    // Add styles for microphone button
-    const micStyles = document.createElement('style');
-    micStyles.textContent = `
-        .mic-button {
-            background-color: transparent;
-            border: none;
-            font-size: 1.2rem;
-        }
-        .mic-button:hover {
-            color: #0d6efd;
-        }
-        .mic-button.recording {
-            color: #dc3545;
-        }
-    `;
-    document.head.appendChild(micStyles);
+    const languageSwitch = container.querySelector('#languageSwitch');
+    const stopTTSButton = container.querySelector('.stop-tts-button');
 
     // Speech recognition setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.lang = 'th-TH';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    let isRecording = false;
-
-    micButton.addEventListener('click', toggleSpeechRecognition);
-
-    // Add this near the top of the script, after the SpeechRecognition setup
+    // Speech synthesis setup
     const synth = window.speechSynthesis;
+
+    // State variables
+    let isRecording = false;
     let lastInputWasSpeech = false;
     let isSpeaking = false;
-    // Add this with other state variables
     let isInErrorState = false;
+    let currentLanguage = 'en-US';
+    let conversationHistory = [];
 
-    // Add these variables after other declarations
-    const languageSwitch = container.querySelector('#languageSwitch');
-    let currentLanguage = 'en-US'; // Default language
-    const stopTTSButton = container.querySelector('.stop-tts-button');
+    // Event listeners
+    micButton.addEventListener('click', toggleSpeechRecognition);
+    languageSwitch.addEventListener('change', updateLanguage);
+    stopTTSButton.addEventListener('click', stopSpeech);
+    chatForm.addEventListener('submit', handleChatSubmit);
 
-    // Add event listener for language switching
-    languageSwitch.addEventListener('change', function() {
-        currentLanguage = this.checked ? 'th-TH' : 'en-US';
-        updateLanguage();
-    });
-
-    // Add some custom CSS for the language switcher
-    const switchStyles = document.createElement('style');
-    switchStyles.textContent = `
-        .language-switcher .form-check-input {
-            width: 3em;
+    // Functions
+    function toggleSpeechRecognition() {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            isInErrorState = false;
+            startRecording();
         }
-        .language-switcher .form-check-input:checked {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-    `;
-    document.head.appendChild(switchStyles);
+    }
 
-   // Function to update language-dependent elements
+    function startRecording() {
+        if (!isRecording && !isSpeaking && !isInErrorState) {
+            isRecording = true;
+            lastInputWasSpeech = true;
+            micButton.classList.add('recording');
+            recognition.start();
+        }
+    }
+
+    function stopRecording() {
+        if (isRecording) {
+            isRecording = false;
+            micButton.classList.remove('recording');
+            recognition.stop();
+        }
+    }
+
     function updateLanguage() {
+        currentLanguage = languageSwitch.checked ? 'th-TH' : 'en-US';
         recognition.lang = currentLanguage;
         chatInput.placeholder = currentLanguage === 'en-US' ? 'Type a message...' : 'พิมพ์ข้อความ...';
         container.querySelector('.chat-form button[type="submit"]').textContent = 
             currentLanguage === 'en-US' ? 'Send' : 'ส่ง';
     }
 
-    // Modify the speakText function
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = currentLanguage;
@@ -203,8 +218,7 @@
         synth.speak(utterance);
     }
 
-    // Add event listener for stop button
-    stopTTSButton.addEventListener('click', () => {
+    function stopSpeech() {
         if (synth.speaking) {
             synth.cancel();
             isSpeaking = false;
@@ -213,74 +227,9 @@
                 setTimeout(startRecording, 1000);
             }
         }
-    });
-
-    function toggleSpeechRecognition() {
-        if (!isRecording) {
-            startRecording();
-            lastInputWasSpeech = true;
-        } else {
-            stopRecording();
-        }
     }
 
-    function startRecording() {
-        if (!isRecording && !isSpeaking && !isInErrorState) {
-            isRecording = true;
-            lastInputWasSpeech = true;
-            micButton.classList.add('recording');
-            recognition.start();
-        }
-    }    
-
-    function stopRecording() {
-        if (isRecording) {
-            isRecording = false;
-            micButton.classList.remove('recording');
-            recognition.stop();
-        }
-    }
-
-    recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript;
-        chatInput.value = transcript;
-    };
-
-    recognition.onerror = function(event) {
-        console.error('Speech recognition error:', event.error);
-        stopRecording();
-        isInErrorState = true;
-        
-        const errorMessage = currentLanguage === 'en-US' 
-            ? 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.'
-            : 'ขออภัย เกิดข้อผิดพลาดในการรับรู้เสียง โปรดลองอีกครั้งโดยคลิกที่ปุ่มไมโครโฟน';
-        addMessage('bot', errorMessage);
-        
-        lastInputWasSpeech = false;
-    };
-
-    updateLanguage();
-
-    recognition.onend = function() {
-        stopRecording();
-        if (chatInput.value.trim()) {
-            chatForm.dispatchEvent(new Event('submit'));
-        } else if (!isSpeaking && !isInErrorState) {
-            // Only start recording again if not in error state
-            setTimeout(startRecording, 1000);
-        }
-    };
-
-    micButton.addEventListener('click', () => {
-        if (isRecording) {
-            stopRecording();
-        } else {
-            isInErrorState = false;  // Reset error state when manually starting
-            startRecording();
-        }
-    });
-
-    chatForm.addEventListener('submit', async function(e) {
+    async function handleChatSubmit(e) {
         e.preventDefault();
         const message = chatInput.value.trim();
         if (message) {
@@ -295,7 +244,6 @@
                 removeTypingIndicator();
                 addMessage('bot', botReply);
                 
-                // Add the bot's reply to the conversation history
                 conversationHistory.push({
                     role: "assistant",
                     content: botReply
@@ -315,27 +263,19 @@
                 addMessage('bot', 'Sorry, I encountered an error. Please try again.');
             }
         }
-    });
+    }
 
-    // Add this variable to store conversation history
-    let conversationHistory = [];
-
-    // Modify the sendMessageToAPI function
     async function sendMessageToAPI(message) {
         const apiUrl = 'https://api.eidy.cloud/v1/chat/completions';
         const bearerToken = 'float16-gyZvmO6wlR9IbVSmcK6ol57x8dflOpHZ9v0ssboRZZmJ3R8Bud';
     
-        // Add the new user message to the conversation history
         conversationHistory.push({
             role: "user",
             content: message
         });
     
-        // Prepare the messages array for the API request
-        const messages = [...conversationHistory];
-    
         const data = {
-            messages: messages,
+            messages: conversationHistory,
             model: "eidy",
             max_tokens: 1024,
             temperature: 0.1,
@@ -346,7 +286,7 @@
             headers: {
                 'Authorization': `Bearer ${bearerToken}`,
                 'Content-Type': 'application/json',
-                'Accept-Language': currentLanguage.split('-')[0] // 'en' or 'th'
+                'Accept-Language': currentLanguage.split('-')[0]
             }
         };
     
@@ -378,4 +318,35 @@
             typingIndicator.remove();
         }
     }
+
+    // Speech recognition event handlers
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        chatInput.value = transcript;
+    };
+
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        stopRecording();
+        isInErrorState = true;
+        
+        const errorMessage = currentLanguage === 'en-US' 
+            ? 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.'
+            : 'ขออภัย เกิดข้อผิดพลาดในการรับรู้เสียง โปรดลองอีกครั้งโดยคลิกที่ปุ่มไมโครโฟน';
+        addMessage('bot', errorMessage);
+        
+        lastInputWasSpeech = false;
+    };
+
+    recognition.onend = function() {
+        stopRecording();
+        if (chatInput.value.trim()) {
+            chatForm.dispatchEvent(new Event('submit'));
+        } else if (!isSpeaking && !isInErrorState) {
+            setTimeout(startRecording, 1000);
+        }
+    };
+
+    // Initialize
+    updateLanguage();
 })();
