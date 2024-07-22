@@ -142,9 +142,20 @@
 
     micButton.addEventListener('click', toggleSpeechRecognition);
 
+    // Add this near the top of the script, after the SpeechRecognition setup
+    const synth = window.speechSynthesis;
+    let lastInputWasSpeech = false;
+
+    // Add this function to handle text-to-speech
+    function speakText(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        synth.speak(utterance);
+    }
+
     function toggleSpeechRecognition() {
         if (!isRecording) {
             startRecording();
+            lastInputWasSpeech = true;
         } else {
             stopRecording();
         }
@@ -193,6 +204,12 @@
                 const botReply = response.data.choices[0].message.content;
                 removeTypingIndicator();
                 addMessage('bot', botReply);
+                
+                // If the last input was speech, speak the response
+                if (lastInputWasSpeech) {
+                    speakText(botReply);
+                    lastInputWasSpeech = false;
+                }
             } catch (error) {
                 console.error('Error:', error);
                 removeTypingIndicator();
