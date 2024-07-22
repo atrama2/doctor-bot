@@ -157,7 +157,7 @@
                             <label class="form-check-label" for="languageSwitch">TH</label>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2h</small>
+                    <small class="text-muted">v0.0.2i</small>
                 </div>
             </div>
         `;
@@ -170,6 +170,7 @@
         const micButton = container.querySelector('.mic-button');
         const languageSwitch = container.querySelector('#languageSwitch');
         const stopTTSButton = container.querySelector('.stop-tts-button');
+        const RECORDING_TIMEOUT = 5000; // 5 seconds
 
         let currentLanguage = 'en-US';
         let isRecording = false;
@@ -211,12 +212,21 @@
             }
         }
 
+        let recordingTimeout;
+
         function startRecording() {
-            if (!isRecording && !isSpeaking && !isInErrorState && annyang) {
+            if (!isRecording && !isSpeaking && !isInErrorState && !isWaitingForAPI && annyang) {
                 isRecording = true;
                 lastInputWasSpeech = true;
                 micButton.classList.add('recording');
                 annyang.start({ autoRestart: false, continuous: false });
+        
+                // Set a timeout to stop recording after RECORDING_TIMEOUT milliseconds
+                recordingTimeout = setTimeout(() => {
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                }, RECORDING_TIMEOUT);
             }
         }
 
@@ -225,12 +235,14 @@
                 isRecording = false;
                 micButton.classList.remove('recording');
                 annyang.abort();
+                clearTimeout(recordingTimeout);
             }
         }
 
         function handleSpeechResult(phrases) {
             if (phrases.length > 0) {
                 chatInput.value = phrases[0];
+                stopRecording();
                 handleFormSubmit(new Event('submit'));
             }
         }
