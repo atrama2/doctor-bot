@@ -228,7 +228,7 @@
     
             // Android-specific delay:
             if (isAndroid) {
-                await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 500ms
             }
     
         } else {
