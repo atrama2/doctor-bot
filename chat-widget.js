@@ -81,11 +81,14 @@
                 <button class="btn btn-primary" type="submit">Send</button>
             </div>
         </form>
-        <div class="chat-footer d-flex justify-content-end align-items-center mt-2">
-            <span class="me-2">EN</span>
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="languageSwitch">
-                <label class="form-check-label" for="languageSwitch">TH</label>
+        <div class="chat-footer d-flex justify-content-between align-items-center mt-2">
+            <button class="btn btn-sm btn-danger stop-tts-button" style="display: none;">Stop Speech</button>
+            <div class="d-flex align-items-center">
+                <span class="me-2">EN</span>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="languageSwitch">
+                    <label class="form-check-label" for="languageSwitch">TH</label>
+                </div>
             </div>
         </div>
     </div>
@@ -145,6 +148,7 @@
     // Add these variables after other declarations
     const languageSwitch = container.querySelector('#languageSwitch');
     let currentLanguage = 'en-US'; // Default language
+    const stopTTSButton = container.querySelector('.stop-tts-button');
 
     // Add event listener for language switching
     languageSwitch.addEventListener('change', function() {
@@ -176,15 +180,16 @@
     // Modify the speakText function
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = currentLanguage;  // Set language to Thai
+        utterance.lang = currentLanguage;
         
         utterance.onstart = () => {
             isSpeaking = true;
+            stopTTSButton.style.display = 'block';
         };
         
         utterance.onend = () => {
             isSpeaking = false;
-            // Only start recording if not in error state
+            stopTTSButton.style.display = 'none';
             if (!isInErrorState) {
                 setTimeout(() => {
                     if (!isRecording && !isSpeaking) {
@@ -196,6 +201,18 @@
         
         synth.speak(utterance);
     }
+
+    // Add event listener for stop button
+    stopTTSButton.addEventListener('click', () => {
+        if (synth.speaking) {
+            synth.cancel();
+            isSpeaking = false;
+            stopTTSButton.style.display = 'none';
+            if (!isInErrorState) {
+                setTimeout(startRecording, 1000);
+            }
+        }
+    });
 
     function toggleSpeechRecognition() {
         if (!isRecording) {
@@ -278,9 +295,11 @@
                 addMessage('bot', botReply);
                 
                 if (lastInputWasSpeech) {
+                    if (synth.speaking) {
+                        synth.cancel();
+                    }
                     speakText(botReply);
                 } else {
-                    // If it wasn't speech input, reset lastInputWasSpeech
                     lastInputWasSpeech = false;
                 }
             } catch (error) {
