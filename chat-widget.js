@@ -90,6 +90,7 @@
                     <label class="form-check-label" for="languageSwitch">TH</label>
                 </div>
             </div>
+            <small class="text-muted">v0.0.1a</small>
         </div>
     </div>
 `;
