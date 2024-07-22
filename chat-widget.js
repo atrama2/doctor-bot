@@ -285,11 +285,16 @@
         
         if (chatInput.value.trim()) {
             chatForm.dispatchEvent(new Event('submit'));
-        } else if (!isSpeaking && !isInErrorState && !isAndroid) {
-            // Only restart on non-Android devices
-            setTimeout(startRecording, 1000);
+        } else if (!isSpeaking && !isInErrorState) {
+            setTimeout(() => {
+                if (!isRecording && !isSpeaking && !isAndroid) {
+                    startRecording();
+                } else if (!isRecording && !isSpeaking && isAndroid) {
+                    setTimeout(startRecording, 5000);  // Adding a delay before restarting recognition for Android
+                }
+            }, 1000);  // Adding a delay before restarting recognition for non-Android
         }
-    };
+    };    
 
     micButton.addEventListener('click', () => {
         if (isRecording) {
