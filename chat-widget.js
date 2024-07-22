@@ -217,10 +217,20 @@
         }
     });
 
-    function toggleSpeechRecognition() {
+    async function toggleSpeechRecognition() {
+        // ... (rest of the toggleSpeechRecognition function)
+        // Update language before starting or stopping
+        updateLanguage(); 
+    
         if (!isRecording) {
             startRecording();
             lastInputWasSpeech = true;
+    
+            // Android-specific delay:
+            if (isAndroid) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+            }
+    
         } else {
             stopRecording();
         }
