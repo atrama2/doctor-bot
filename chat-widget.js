@@ -52,51 +52,44 @@
             background-color: #f8f9fa;
             border-top: 1px solid #dee2e6;
         }
-        .typing-indicator {
-            display: flex;
-            padding: 0.5rem;
-            background-color: #f0f0f0;
-            border-radius: 1rem;
-            margin-bottom: 0.5rem;
+        .chat-footer {
+            padding: 0.5rem 1rem;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
         }
-        .typing-indicator span {
-            height: 0.5rem;
-            width: 0.5rem;
-            background-color: #333;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 0.25rem;
-            animation: typing 1s infinite ease-in-out;
+        .form-check-input {
+            width: 3em;
         }
-        .typing-indicator span:nth-child(2) {
-            animation-delay: 0.2s;
+        .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
         }
-        .typing-indicator span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes typing {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
-            100% { transform: translateY(0px); }
-        }
+        /* ... (rest of the existing styles) */
     `;
     document.head.appendChild(style);
 
     // Create chat HTML
     const chatHTML = `
-        <div class="chat-container shadow">
-            <div class="chat-messages"></div>
-            <form class="chat-form">
-                <div class="input-group">
-                    <button class="btn btn-outline-secondary mic-button" type="button">
-                        <i class="bi bi-mic"></i>
-                    </button>
-                    <input type="text" class="form-control chat-input" placeholder="Type a message...">
-                    <button class="btn btn-primary" type="submit">Send</button>
-                </div>
-            </form>
+    <div class="chat-container shadow d-flex flex-column">
+        <div class="chat-messages flex-grow-1"></div>
+        <form class="chat-form">
+            <div class="input-group">
+                <button class="btn btn-outline-secondary mic-button" type="button">
+                    <i class="bi bi-mic"></i>
+                </button>
+                <input type="text" class="form-control chat-input" placeholder="Type a message...">
+                <button class="btn btn-primary" type="submit">Send</button>
+            </div>
+        </form>
+        <div class="chat-footer d-flex justify-content-end align-items-center mt-2">
+            <span class="me-2">EN</span>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="languageSwitch">
+                <label class="form-check-label" for="languageSwitch">TH</label>
+            </div>
         </div>
-    `;
+    </div>
+`;
 
     // Inject the chat HTML
     container.innerHTML = chatHTML;
@@ -134,7 +127,7 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.lang = 'en-US';
+    recognition.lang = 'th-TH';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -149,9 +142,41 @@
     // Add this with other state variables
     let isInErrorState = false;
 
+    // Add these variables after other declarations
+    const languageSwitch = container.querySelector('#languageSwitch');
+    let currentLanguage = 'en-US'; // Default language
+
+    // Add event listener for language switching
+    languageSwitch.addEventListener('change', function() {
+        currentLanguage = this.checked ? 'th-TH' : 'en-US';
+        updateLanguage();
+    });
+
+    // Add some custom CSS for the language switcher
+    const switchStyles = document.createElement('style');
+    switchStyles.textContent = `
+        .language-switcher .form-check-input {
+            width: 3em;
+        }
+        .language-switcher .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+    `;
+    document.head.appendChild(switchStyles);
+
+   // Function to update language-dependent elements
+    function updateLanguage() {
+        recognition.lang = currentLanguage;
+        chatInput.placeholder = currentLanguage === 'en-US' ? 'Type a message...' : 'พิมพ์ข้อความ...';
+        container.querySelector('.chat-form button[type="submit"]').textContent = 
+            currentLanguage === 'en-US' ? 'Send' : 'ส่ง';
+    }
+
     // Modify the speakText function
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = currentLanguage;  // Set language to Thai
         
         utterance.onstart = () => {
             isSpeaking = true;
@@ -208,10 +233,15 @@
         stopRecording();
         isInErrorState = true;
         
-        addMessage('bot', 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.');
+        const errorMessage = currentLanguage === 'en-US' 
+            ? 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.'
+            : 'ขออภัย เกิดข้อผิดพลาดในการรับรู้เสียง โปรดลองอีกครั้งโดยคลิกที่ปุ่มไมโครโฟน';
+        addMessage('bot', errorMessage);
         
         lastInputWasSpeech = false;
     };
+
+    updateLanguage();
 
     recognition.onend = function() {
         stopRecording();
@@ -261,6 +291,7 @@
         }
     });
 
+    // Modify the sendMessageToAPI function
     async function sendMessageToAPI(message) {
         const apiUrl = 'https://api.eidy.cloud/v1/chat/completions';
         const bearerToken = 'float16-gyZvmO6wlR9IbVSmcK6ol57x8dflOpHZ9v0ssboRZZmJ3R8Bud';
@@ -279,7 +310,8 @@
         const config = {
             headers: {
                 'Authorization': `Bearer ${bearerToken}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept-Language': currentLanguage.split('-')[0] // 'en' or 'th'
             }
         };
 
@@ -290,7 +322,7 @@
         const messageElement = document.createElement('div');
         messageElement.className = `chat-message ${sender}`;
         messageElement.innerHTML = `
-            <strong>${sender === 'user' ? 'You' : 'Bot'}:</strong>
+            <strong>${sender === 'user' ? (currentLanguage === 'en-US' ? 'You' : 'คุณ') : 'Bot'}:</strong>
             <span>${text}</span>
         `;
         chatMessages.appendChild(messageElement);
