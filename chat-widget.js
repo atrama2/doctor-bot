@@ -126,15 +126,18 @@
     `;
     document.head.appendChild(micStyles);
 
+    let currentLanguage = 'en-US'; // Default language
+
     // Speech recognition setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.lang = 'th-TH';
+    recognition.lang = currentLanguage;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
     let isRecording = false;
+    let isAndroid = /Android/i.test(navigator.userAgent);
 
     micButton.addEventListener('click', toggleSpeechRecognition);
 
@@ -147,7 +150,6 @@
 
     // Add these variables after other declarations
     const languageSwitch = container.querySelector('#languageSwitch');
-    let currentLanguage = 'en-US'; // Default language
     const stopTTSButton = container.querySelector('.stop-tts-button');
 
     // Add event listener for language switching
@@ -170,7 +172,7 @@
     document.head.appendChild(switchStyles);
 
    // Function to update language-dependent elements
-    function updateLanguage() {
+   function updateLanguage() {
         recognition.lang = currentLanguage;
         chatInput.placeholder = currentLanguage === 'en-US' ? 'Type a message...' : 'พิมพ์ข้อความ...';
         container.querySelector('.chat-form button[type="submit"]').textContent = 
@@ -181,6 +183,7 @@
     function speakText(text) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = currentLanguage;
+        utterance.rate = 1.2;  // Set your desired fixed speed here (e.g., 1.2 for 20% faster)
         
         utterance.onstart = () => {
             isSpeaking = true;
@@ -230,7 +233,7 @@
             micButton.classList.add('recording');
             recognition.start();
         }
-    }    
+    }   
 
     function stopRecording() {
         if (isRecording) {
@@ -240,19 +243,30 @@
         }
     }
 
+    recognition.onstart = function() {
+        console.log('Speech recognition started');
+    };
+
     recognition.onresult = function(event) {
         const transcript = event.results[0][0].transcript;
         chatInput.value = transcript;
+        if (isAndroid) {
+            chatForm.dispatchEvent(new Event('submit'));
+        }
     };
 
     recognition.onerror = function(event) {
         console.error('Speech recognition error:', event.error);
-        stopRecording();
+        isRecording = false;
+        micButton.classList.remove('recording');
         isInErrorState = true;
         
-        const errorMessage = currentLanguage === 'en-US' 
-            ? 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.'
-            : 'ขออภัย เกิดข้อผิดพลาดในการรับรู้เสียง โปรดลองอีกครั้งโดยคลิกที่ปุ่มไมโครโฟน';
+        let errorMessage;
+        if (currentLanguage === 'en-US') {
+            errorMessage = 'Sorry, there was an error with speech recognition. Please try again by clicking the microphone button.';
+        } else {
+            errorMessage = 'ขออภัย เกิดข้อผิดพลาดในการรับรู้เสียง โปรดลองอีกครั้งโดยคลิกที่ปุ่มไมโครโฟน';
+        }
         addMessage('bot', errorMessage);
         
         lastInputWasSpeech = false;
@@ -261,11 +275,14 @@
     updateLanguage();
 
     recognition.onend = function() {
-        stopRecording();
+        console.log('Speech recognition ended');
+        isRecording = false;
+        micButton.classList.remove('recording');
+        
         if (chatInput.value.trim()) {
             chatForm.dispatchEvent(new Event('submit'));
-        } else if (!isSpeaking && !isInErrorState) {
-            // Only start recording again if not in error state
+        } else if (!isSpeaking && !isInErrorState && !isAndroid) {
+            // Only restart on non-Android devices
             setTimeout(startRecording, 1000);
         }
     };
