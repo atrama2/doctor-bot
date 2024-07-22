@@ -198,9 +198,9 @@
                     if (!isRecording && !isSpeaking) {
                         startRecording();
                     }
-                }, 1000);
+                }, 1000); // Adding a delay before restarting recognition
             }
-        };
+        };        
         
         synth.speak(utterance);
     }
@@ -233,7 +233,7 @@
             micButton.classList.add('recording');
             recognition.start();
         }
-    }   
+    }       
 
     function stopRecording() {
         if (isRecording) {
@@ -270,7 +270,11 @@
         addMessage('bot', errorMessage);
         
         lastInputWasSpeech = false;
-    };
+    
+        setTimeout(() => {
+            isInErrorState = false;
+        }, 3000); // Allow 3 seconds before resetting error state
+    };    
 
     updateLanguage();
 
