@@ -87,6 +87,7 @@
                 <input class="form-check-input" type="checkbox" id="languageSwitch">
                 <label class="form-check-label" for="languageSwitch">TH</label>
             </div>
+            <small class="text-muted">v0.0.2a</small>
         </div>
     </div>
 `;
@@ -206,20 +207,35 @@
         }
     }
 
+    let recognitionTimeout;
+
     function startRecording() {
         if (!isRecording && !isSpeaking && !isInErrorState) {
             isRecording = true;
             lastInputWasSpeech = true;
             micButton.classList.add('recording');
             recognition.start();
+            
+            // Set a timeout to stop recording if no speech is detected
+            recognitionTimeout = setTimeout(() => {
+                if (isRecording) {
+                    stopRecording();
+                    isInErrorState = true;
+                    const errorMessage = currentLanguage === 'en-US' 
+                        ? 'No speech detected. Please try again.'
+                        : 'ไม่พบเสียงพูด โปรดลองอีกครั้ง';
+                    addMessage('bot', errorMessage);
+                }
+            }, 5000); // Adjust the timeout as needed (e.g., 5000ms = 5 seconds)
         }
-    }    
+    }  
 
     function stopRecording() {
         if (isRecording) {
             isRecording = false;
             micButton.classList.remove('recording');
             recognition.stop();
+            clearTimeout(recognitionTimeout);
         }
     }
 
@@ -239,6 +255,10 @@
         addMessage('bot', errorMessage);
         
         lastInputWasSpeech = false;
+    };
+
+    recognition.onspeechend = function() {
+        stopRecording();
     };
 
     updateLanguage();
