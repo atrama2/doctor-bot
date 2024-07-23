@@ -157,7 +157,7 @@
                             <label class="form-check-label" for="languageSwitch">TH</label>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2j</small>
+                    <small class="text-muted">v0.0.2k</small>
                 </div>
             </div>
         `;
@@ -351,9 +351,10 @@
                 const response = await axios.post(config.apiUrl, {
                     messages: [...conversationHistory, { role: "user", content: modifiedMessage }],
                     model: "eidy",
-                    max_tokens: 1024,
-                    temperature: 0.1,
-                    stream: false
+                    max_tokens: 512,
+                    temperature: 0.4,
+                    stream: false,
+                    random_seed: Math.floor(Math.random() * 10)
                 }, {
                     headers: {
                         'Authorization': `Bearer ${config.bearerToken}`,
