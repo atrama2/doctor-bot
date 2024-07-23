@@ -157,7 +157,7 @@
                             <label class="form-check-label" for="languageSwitch">TH</label>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2i</small>
+                    <small class="text-muted">v0.0.2j</small>
                 </div>
             </div>
         `;
