@@ -343,8 +343,13 @@
         // API interaction
         async function sendMessageToAPI(message) {
             try {
+                let modifiedMessage = message;
+                if (currentLanguage === 'th-TH') {
+                    modifiedMessage += " ตอบเป็นภาษาไทย";
+                }
+        
                 const response = await axios.post(config.apiUrl, {
-                    messages: [...conversationHistory, { role: "user", content: message }],
+                    messages: [...conversationHistory, { role: "user", content: modifiedMessage }],
                     model: "eidy",
                     max_tokens: 1024,
                     temperature: 0.1,
