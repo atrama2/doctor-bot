@@ -24,8 +24,7 @@
         loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css', 'css'),
         loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', 'js'),
         loadExternalResource('https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js', 'js'),
-        loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css', 'css'),
-        loadExternalResource('https://cdnjs.cloudflare.com/ajax/libs/annyang/2.6.1/annyang.min.js', 'js')
+        loadExternalResource('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css', 'css')
     ]).then(() => {
         initializeChat();
     }).catch(error => {
@@ -204,14 +203,17 @@
         let isWaitingForAPI = false;
 
         const synth = window.speechSynthesis;
+        let recognition;
 
-        // Initialize annyang
-        if (annyang) {
-            annyang.addCallback('result', handleSpeechResult);
-            annyang.addCallback('errorNetwork', handleSpeechError);
-            annyang.addCallback('errorPermissionBlocked', handleSpeechError);
-            annyang.addCallback('errorPermissionDenied', handleSpeechError);
-            annyang.addCallback('end', handleSpeechEnd);
+        // Initialize Web Speech API
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onerror = handleSpeechError;
+            recognition.onend = handleSpeechEnd;
         } else {
             console.error('Speech recognition is not supported in this browser.');
             micButton.style.display = 'none';
@@ -238,12 +240,13 @@
         let recordingTimeout;
 
         function startRecording() {
-            if (!isRecording && !isSpeaking && !isInErrorState && !isWaitingForAPI && annyang) {
+            if (!isRecording && !isSpeaking && !isInErrorState && !isWaitingForAPI && recognition) {
                 isRecording = true;
                 lastInputWasSpeech = true;
                 micButton.classList.add('recording');
-                annyang.start({ autoRestart: false, continuous: false });
-        
+                recognition.lang = currentLanguage;
+                recognition.start();
+
                 // Set a timeout to stop recording after RECORDING_TIMEOUT milliseconds
                 recordingTimeout = setTimeout(() => {
                     if (isRecording) {
@@ -254,24 +257,25 @@
         }
 
         function stopRecording() {
-            if (isRecording && annyang) {
+            if (isRecording && recognition) {
                 isRecording = false;
                 micButton.classList.remove('recording');
-                annyang.abort();
+                recognition.stop();
                 clearTimeout(recordingTimeout);
             }
         }
 
-        function handleSpeechResult(phrases) {
-            if (phrases.length > 0) {
-                chatInput.value = phrases[0];
-                stopRecording();
-                handleFormSubmit(new Event('submit'));
-            }
+        function handleSpeechResult(event) {
+            const last = event.results.length - 1;
+            const text = event.results[last][0].transcript;
+
+            chatInput.value = text;
+            stopRecording();
+            handleFormSubmit(new Event('submit'));
         }
 
-        function handleSpeechError() {
-            console.error('Speech recognition error');
+        function handleSpeechError(event) {
+            console.error('Speech recognition error', event.error);
             stopRecording();
             isInErrorState = true;
             
@@ -312,6 +316,13 @@
                 }
             };
             
+            utterance.onerror = (event) => {
+                console.error('Text-to-speech error:', event);
+                addMessage('bot', 'Sorry, there was an error with text-to-speech. Please read the message instead.');
+                isSpeaking = false;
+                stopTTSButton.style.display = 'none';
+            };
+            
             synth.speak(utterance);
         }
 
@@ -329,8 +340,8 @@
         // UI update functions
         function updateLanguage() {
             currentLanguage = languageSwitch.checked ? 'th-TH' : 'en-US';
-            if (annyang) {
-                annyang.setLanguage(currentLanguage);
+            if (recognition) {
+                recognition.lang = currentLanguage;
             }
             chatInput.placeholder = currentLanguage === 'en-US' ? 'Type a message...' : 'พิมพ์ข้อความ...';
             container.querySelector('.chat-form button[type="submit"]').textContent = 
@@ -429,4 +440,9 @@
             }
         }
     }
+
+    window.speechSynthesis.onvoiceschanged = function () {
+        const voices = window.speechSynthesis.getVoices()
+        console.log('voices', voices) // Array of voices or empty if none are installed
+      }
 })();
