@@ -440,9 +440,4 @@
             }
         }
     }
-
-    window.speechSynthesis.onvoiceschanged = function () {
-        const voices = window.speechSynthesis.getVoices()
-        console.log('voices', voices) // Array of voices or empty if none are installed
-      }
 })();
