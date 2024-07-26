@@ -151,7 +151,7 @@
         container.innerHTML = `
             <div class="container-fluid">
                 <div class="row">
-                    <div class="col-9">
+                    <div class="col-6">
                         <div class="video-container">
                             <iframe src="https://con.defence-innovation.com/1675/90" frameborder="0" allowfullscreen></iframe>
                         </div>
@@ -177,7 +177,7 @@
                                         <label class="form-check-label" for="languageSwitch">TH</label>
                                     </div>
                                 </div>
-                                <small class="text-muted">v0.0.2l</small>
+                                <small class="text-muted">v0.0.2m</small>
                             </div>
                         </div>
                     </div>
