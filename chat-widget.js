@@ -176,7 +176,7 @@
                                         <label class="form-check-label" for="languageSwitch">TH</label>
                                     </div>
                                 </div>
-                                <small class="text-muted">v0.0.2m</small>
+                                <small class="text-muted">v0.0.2n</small>
                             </div>
                         </div>
                     </div>
@@ -285,6 +285,11 @@
             addMessage('bot', errorMessage);
             
             lastInputWasSpeech = false;
+
+            // Reset the error state after a short delay
+            setTimeout(() => {
+                isInErrorState = false;
+            }, 2000);
         }
 
         function handleSpeechEnd() {
