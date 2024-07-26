@@ -152,7 +152,7 @@
                 <div class="row">
                     <div class="col-6">
                         <div class="video-container">
-                            <iframe src="https://con.defence-innovation.com/1675/90" frameborder="0" allowfullscreen></iframe>
+                            <iframe allow="camera; microphone; fullscreen; display-capture; autoplay" src="https://con.defence-innovation.com/1675/90" style="height: 100%; width: 100%; border: 0px;"></iframe>
                         </div>
                     </div>
                     <div class="col-3">
