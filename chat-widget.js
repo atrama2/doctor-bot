@@ -38,15 +38,14 @@
             console.error('Chat container not found');
             return;
         }
-
+    
         // Configuration object
         const config = {
-            width: container.dataset.width || '300px',
             height: container.dataset.height || '400px',
             apiUrl: 'https://api.eidy.cloud/v1/chat/completions',
-            bearerToken: 'float16-gyZvmO6wlR9IbVSmcK6ol57x8dflOpHZ9v0ssboRZZmJ3R8Bud' // Note: Still not secure, consider server-side handling
+            bearerToken: 'float16-gyZvmO6wlR9IbVSmcK6ol57x8dflOpHZ9v0ssboRZZmJ3R8Bud'
         };
-
+    
         injectStyles(config);
         injectHTML(container);
         setupEventListeners(container, config);
@@ -55,6 +54,19 @@
     function injectStyles(config) {
         const style = document.createElement('style');
         style.textContent = `
+            .video-container {
+                position: relative;
+                padding-bottom: 56.25%; /* 16:9 aspect ratio */
+                height: 0;
+                overflow: hidden;
+            }
+            .video-container iframe {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
             .chat-container {
                 width: ${config.width};
                 height: ${config.height};
@@ -137,27 +149,38 @@
 
     function injectHTML(container) {
         container.innerHTML = `
-            <div class="chat-container shadow d-flex flex-column">
-                <div class="chat-messages flex-grow-1"></div>
-                <form class="chat-form">
-                    <div class="input-group">
-                        <button class="btn btn-outline-secondary mic-button" type="button">
-                            <i class="bi bi-mic"></i>
-                        </button>
-                        <input type="text" class="form-control chat-input" placeholder="Type a message...">
-                        <button class="btn btn-primary" type="submit">Send</button>
-                    </div>
-                </form>
-                <div class="chat-footer d-flex justify-content-between align-items-center mt-2">
-                    <button class="btn btn-sm btn-danger stop-tts-button" style="display: none;">Stop Speech</button>
-                    <div class="d-flex align-items-center">
-                        <span class="me-2">EN</span>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="languageSwitch">
-                            <label class="form-check-label" for="languageSwitch">TH</label>
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-9">
+                        <div class="video-container">
+                            <iframe src="https://con.defence-innovation.com/1675/90" frameborder="0" allowfullscreen></iframe>
                         </div>
                     </div>
-                    <small class="text-muted">v0.0.2k</small>
+                    <div class="col-3">
+                        <div class="chat-container shadow d-flex flex-column">
+                            <div class="chat-messages flex-grow-1"></div>
+                            <form class="chat-form">
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary mic-button" type="button">
+                                        <i class="bi bi-mic"></i>
+                                    </button>
+                                    <input type="text" class="form-control chat-input" placeholder="Type a message...">
+                                    <button class="btn btn-primary" type="submit">Send</button>
+                                </div>
+                            </form>
+                            <div class="chat-footer d-flex justify-content-between align-items-center mt-2">
+                                <button class="btn btn-sm btn-danger stop-tts-button" style="display: none;">Stop Speech</button>
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">EN</span>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="languageSwitch">
+                                        <label class="form-check-label" for="languageSwitch">TH</label>
+                                    </div>
+                                </div>
+                                <small class="text-muted">v0.0.2k</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
