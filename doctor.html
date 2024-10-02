@@ -4,8 +4,200 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Doctor Side</title>
+    <script src='https://con.defence-innovation.com/external_api.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        #level {
+            width: 100%;
+            height: 30px;
+            background-color: lightgray;
+            position: relative;
+            display: none;
+
+        }
+        #level div {
+            height: 100%;
+            background-color: green;
+            display: none;
+        }
+        #value {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            color: black;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+    <style>
+        #container {
+            display: flex;
+        }
+        #jitsi-container {
+            width: 800px;
+            height: 600px;
+        }
+        #transcript-box {
+            width: 300px;
+            height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-left: 10px;
+        }
+    </style>
 </head>
 <body>
+    <div id="container">
+        <div id="jitsi-container"></div>
+        <div id="transcript-box"></div>
+    </div>
+    <div id="level">
+        <div></div>
+        <span id="value">0</span>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let belowThresholdTime = 0;
+        let recorder;
+        let audioChunks = [];
+        let talkingLevel;
+        let ambientNoiseLevel = 0;
     
+        async function setupMicrophone() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            const scriptProcessor = audioContext.createScriptProcessor(256, 1, 1);
+    
+            analyser.smoothingTimeConstant = 0.8;
+            analyser.fftSize = 1024;
+    
+            microphone.connect(analyser);
+            analyser.connect(scriptProcessor);
+            scriptProcessor.connect(audioContext.destination);
+    
+            // Measure ambient noise level
+            measureAmbientNoise(analyser, scriptProcessor, audioContext);
+    
+            scriptProcessor.onaudioprocess = function() {
+                const array = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(array);
+                const average = array.reduce((a, b) => a + b) / array.length;
+                const level = document.querySelector('#level div');
+                const value = document.querySelector('#value');
+                level.style.width = `${average}%`;
+                value.textContent = Math.round(average);
+    
+                if (average > talkingLevel) {
+                    if (!isRecording) {
+                        startRecording(stream);
+                    }
+                    belowThresholdTime = 0;
+                } else {
+                    belowThresholdTime += scriptProcessor.bufferSize / audioContext.sampleRate;
+                    if (isRecording && belowThresholdTime >= 3) {
+                        stopRecording();
+                    }
+                }
+            };
+        }
+    
+        function measureAmbientNoise(analyser, scriptProcessor, audioContext) {
+            let measurements = [];
+            let measureCount = 0;
+            const measureDuration = 3; // seconds
+    
+            const measureInterval = setInterval(() => {
+                const array = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(array);
+                const average = array.reduce((a, b) => a + b) / array.length;
+                measurements.push(average);
+                measureCount += scriptProcessor.bufferSize / audioContext.sampleRate;
+    
+                if (measureCount >= measureDuration) {
+                    clearInterval(measureInterval);
+                    ambientNoiseLevel = measurements.reduce((a, b) => a + b) / measurements.length;
+                    talkingLevel = ambientNoiseLevel + 5; // Set talking level above ambient noise
+                    console.log(`Ambient Noise Level: ${ambientNoiseLevel}, Talking Level: ${talkingLevel}`);
+                }
+            }, scriptProcessor.bufferSize / audioContext.sampleRate * 1000);
+        }
+    
+        function startRecording(stream) {
+            isRecording = true;
+            recorder = new MediaRecorder(stream);
+            recorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            recorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                // audio.play();
+                audioChunks = [];
+    
+                // Convert audioBlob to base64 string
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+
+                    axios.post('https://api.gowajee.ai/v1/speech-to-text/pulse/transcribe', {
+                        audioData: base64String
+                    }, {
+                        headers: {
+                            'x-api-key': 'gwj_live_5028b9975d2746c280437132750ef2f6_0cjhi'
+                        }
+                    })
+                    .then(response => {
+                        const transcriptBox = document.getElementById('transcript-box');
+                        response.data.output.results.forEach(result => {
+                            const transcript = document.createElement('p');
+                            transcript.textContent = `Gowajee: ${result.transcript}`;
+                            transcriptBox.appendChild(transcript);
+                        });
+                        console.log('Audio uploaded successfully:', response.data);
+                    })
+                    .catch(error => {
+                        console.error('Error uploading audio:', error);
+                    });
+                    
+                    // console.log(base64String);
+                };
+            };
+            recorder.start();
+        }
+    
+        function stopRecording() {
+            isRecording = false;
+            recorder.stop();
+        }
+    
+        setupMicrophone();
+    
+        function createAndJoinRoom(roomName) {
+            const domain = "con.defence-innovation.com";
+            const options = {
+                roomName: roomName,
+                width: 800,
+                height: 600,
+                parentNode: document.querySelector('#jitsi-container'),
+                configOverwrite: {},
+                interfaceConfigOverwrite: {}
+            };
+            const api = new JitsiMeetExternalAPI(domain, options);
+    
+            // Handle audio output problems
+            api.addEventListener('audioOutputProblemDetected', function(event) {
+                console.error('Audio output problem detected:', event);
+            });
+        }
+    
+        createAndJoinRoom("TestRoom");
+    </script>
 </body>
 </html>
