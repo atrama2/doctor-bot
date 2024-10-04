@@ -127,7 +127,13 @@ app.use(express.json({ limit: '50mb' }));
 
 // Define a simple route
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    if (req.query.user === 'doctor') {
+        return res.sendFile(path.join(__dirname, 'doctor.html'));
+    } else if (req.query.user === 'patient') {
+        return res.sendFile(path.join(__dirname, 'patient.html'));
+    } else {
+        res.sendFile(path.join(__dirname, 'index.html'));
+    }
 });
 
 app.get('/doctor', (req, res) => {
