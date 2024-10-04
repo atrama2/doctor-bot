@@ -3,201 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doctor Side</title>
+    <title>Vue.js Setup</title>
+    <!-- Include Vue.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
     <script src='https://con.defence-innovation.com/external_api.js'></script>
+    <!-- Include Tailwind CSS from CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <style>
-        #level {
-            width: 100%;
-            height: 30px;
-            background-color: lightgray;
-            position: relative;
-            display: none;
-
-        }
-        #level div {
-            height: 100%;
-            background-color: green;
-            display: none;
-        }
-        #value {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            color: black;
-            font-weight: bold;
-            display: none;
-        }
-    </style>
-    <style>
-        #container {
-            display: flex;
-        }
-        #jitsi-container {
-            width: 800px;
-            height: 600px;
-        }
-        #transcript-box {
-            width: 300px;
-            height: 600px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-left: 10px;
-        }
-    </style>
 </head>
 <body>
-    <div id="container">
-        <div id="jitsi-container"></div>
-        <div id="transcript-box"></div>
-    </div>
-    <div id="level">
-        <div></div>
-        <span id="value">0</span>
+    <div id="app" style="display: flex;">
+        <div style="flex: 7;">
+            <!-- Content for the left column -->
+            <div id="jitsi-container"></div>
+        </div>
+        <div style="flex: 3;">
+            <!-- Content for the right column -->
+            <div class="flex flex-col justify-start items-start h-full">
+                <button @click="toggleRecording" 
+                        :class="recording ? 'bg-red-500 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-700'"
+                        class="text-white font-bold py-2 px-4 rounded">
+                    <span>{{ recording ? 'Stop Recording' : 'Start Recording' }}</span>
+                </button>
+                <!-- Ensure the transcript-box is below the button -->
+                <div id="transcript-box" class="mt-4 w-full"></div>
+            </div>
+        </div>
     </div>
 
     <script>
-        let isRecording = false;
-        let belowThresholdTime = 0;
-        let recorder;
-        let audioChunks = [];
-        let talkingLevel;
-        let ambientNoiseLevel = 0;
-    
-        async function setupMicrophone() {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const analyser = audioContext.createAnalyser();
-            const microphone = audioContext.createMediaStreamSource(stream);
-            const scriptProcessor = audioContext.createScriptProcessor(256, 1, 1);
-    
-            analyser.smoothingTimeConstant = 0.8;
-            analyser.fftSize = 1024;
-    
-            microphone.connect(analyser);
-            analyser.connect(scriptProcessor);
-            scriptProcessor.connect(audioContext.destination);
-    
-            // Measure ambient noise level
-            measureAmbientNoise(analyser, scriptProcessor, audioContext);
-    
-            scriptProcessor.onaudioprocess = function() {
-                const array = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(array);
-                const average = array.reduce((a, b) => a + b) / array.length;
-                const level = document.querySelector('#level div');
-                const value = document.querySelector('#value');
-                level.style.width = `${average}%`;
-                value.textContent = Math.round(average);
-    
-                if (average > talkingLevel) {
-                    if (!isRecording) {
-                        startRecording(stream);
-                    }
-                    belowThresholdTime = 0;
-                } else {
-                    belowThresholdTime += scriptProcessor.bufferSize / audioContext.sampleRate;
-                    if (isRecording && belowThresholdTime >= 3) {
-                        stopRecording();
-                    }
-                }
-            };
-        }
-    
-        function measureAmbientNoise(analyser, scriptProcessor, audioContext) {
-            let measurements = [];
-            let measureCount = 0;
-            const measureDuration = 3; // seconds
-    
-            const measureInterval = setInterval(() => {
-                const array = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(array);
-                const average = array.reduce((a, b) => a + b) / array.length;
-                measurements.push(average);
-                measureCount += scriptProcessor.bufferSize / audioContext.sampleRate;
-    
-                if (measureCount >= measureDuration) {
-                    clearInterval(measureInterval);
-                    ambientNoiseLevel = measurements.reduce((a, b) => a + b) / measurements.length;
-                    talkingLevel = ambientNoiseLevel + 5; // Set talking level above ambient noise
-                    console.log(`Ambient Noise Level: ${ambientNoiseLevel}, Talking Level: ${talkingLevel}`);
-                }
-            }, scriptProcessor.bufferSize / audioContext.sampleRate * 1000);
-        }
-    
-        function startRecording(stream) {
-            isRecording = true;
-            recorder = new MediaRecorder(stream);
-            recorder.ondataavailable = event => {
-                audioChunks.push(event.data);
-            };
-            recorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
-                // audio.play();
-                audioChunks = [];
-    
-                // Convert audioBlob to base64 string
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
-                reader.onloadend = () => {
-                    const base64String = reader.result.split(',')[1];
+        // Initialize Vue.js instance
+        new Vue({
+            el: '#app',
+            data: {
+                // Define your data properties here
+                recording: false, // Track recording state
+                isRecording: false,
+                belowThresholdTime: 0,
+                recorder: null,
+                audioChunks: [],
+                talkingLevel: 0,
+                ambientNoiseLevel: 0
+            },
+            methods: {
+                // Define your methods here
+                createAndJoinRoom(roomName) {
+                    const domain = "con.defence-innovation.com";
+                    const options = {
+                        roomName: roomName,
+                        width: 1000,
+                        height: 600,
+                        parentNode: document.querySelector('#jitsi-container'),
+                        configOverwrite: {},
+                        interfaceConfigOverwrite: {}
+                    };
+                    const api = new JitsiMeetExternalAPI(domain, options);
 
-                    axios.post('https://api.gowajee.ai/v1/speech-to-text/pulse/transcribe', {
-                        audioData: base64String
-                    }, {
-                        headers: {
-                            'x-api-key': 'gwj_live_5028b9975d2746c280437132750ef2f6_0cjhi'
-                        }
-                    })
-                    .then(response => {
-                        const transcriptBox = document.getElementById('transcript-box');
-                        response.data.output.results.forEach(result => {
-                            const transcript = document.createElement('p');
-                            transcript.textContent = `Gowajee: ${result.transcript}`;
-                            transcriptBox.appendChild(transcript);
-                        });
-                        console.log('Audio uploaded successfully:', response.data);
-                    })
-                    .catch(error => {
-                        console.error('Error uploading audio:', error);
+                    // Handle audio output problems
+                    api.addEventListener('audioOutputProblemDetected', function(event) {
+                        console.error('Audio output problem detected:', event);
                     });
-                    
-                    // console.log(base64String);
-                };
-            };
-            recorder.start();
-        }
-    
-        function stopRecording() {
-            isRecording = false;
-            recorder.stop();
-        }
-    
-        setupMicrophone();
-    
-        function createAndJoinRoom(roomName) {
-            const domain = "con.defence-innovation.com";
-            const options = {
-                roomName: roomName,
-                width: 800,
-                height: 600,
-                parentNode: document.querySelector('#jitsi-container'),
-                configOverwrite: {},
-                interfaceConfigOverwrite: {}
-            };
-            const api = new JitsiMeetExternalAPI(domain, options);
-    
-            // Handle audio output problems
-            api.addEventListener('audioOutputProblemDetected', function(event) {
-                console.error('Audio output problem detected:', event);
-            });
-        }
-    
-        createAndJoinRoom("TestRoom");
+                },
+                startRecording() {
+                    // Clear the transcript box
+                    const transcriptBox = document.querySelector('#transcript-box');
+                    transcriptBox.innerHTML = '';
+
+                    axios.get('/api/recording')
+                        .then(response => {
+                            this.recording = true;
+                            console.log('Recording started:', response.data);
+                        })
+                        .catch(error => {
+                            console.error('Error starting recording:', error);
+                        });
+                },
+                stopRecording() {
+                    axios.get('/api/stop-record')
+                        .then(response => {
+                            this.recording = false;
+
+                            const transcriptBox = document.querySelector('#transcript-box');
+                            response.data.message.forEach(entry => {
+                                const messageElement = document.createElement('div');
+                                messageElement.classList.add('chat-message', 'p-2', 'mb-2', 'bg-gray-100', 'rounded', 'shadow');
+                                const messageTime = new Date(entry.start_time * 1000).toLocaleTimeString();
+                                messageElement.innerHTML = `<strong class="text-blue-500">${entry.user}:</strong> ${entry.transcript} <span class="message-time text-gray-500 text-sm">(${messageTime})</span>`;
+                                transcriptBox.appendChild(messageElement);
+                            });
+
+
+                            console.log('Recording stopped:', response.data);
+                        })
+                        .catch(error => {
+                            console.error('Error stopping recording:', error);
+                        });
+                },
+                toggleRecording() {
+                    if (this.recording) {
+                        this.stopRecording();
+                    } else {
+                        this.startRecording();
+                    }
+                },
+                async initializeMicrophone() {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const analyser = audioContext.createAnalyser();
+                    const microphone = audioContext.createMediaStreamSource(stream);
+                    const scriptProcessor = audioContext.createScriptProcessor(256, 1, 1);
+
+                    analyser.smoothingTimeConstant = 0.8;
+                    analyser.fftSize = 1024;
+
+                    microphone.connect(analyser);
+                    analyser.connect(scriptProcessor);
+                    scriptProcessor.connect(audioContext.destination);
+
+                    this.calculateAmbientNoise(analyser, scriptProcessor, audioContext);
+
+                    scriptProcessor.onaudioprocess = () => {
+                        const array = new Uint8Array(analyser.frequencyBinCount);
+                        analyser.getByteFrequencyData(array);
+                        const average = array.reduce((a, b) => a + b) / array.length;
+                        // const level = document.querySelector('#level div');
+                        // const value = document.querySelector('#value');
+                        // level.style.width = `${average}%`;
+                        // value.textContent = Math.round(average);
+
+                        if (average > this.talkingLevel) {
+                            if (!this.isRecording) {
+                                this.startAudioRecording(stream);
+                            }
+                            this.belowThresholdTime = 0;
+                        } else {
+                            this.belowThresholdTime += scriptProcessor.bufferSize / audioContext.sampleRate;
+                            if (this.isRecording && this.belowThresholdTime >= 3) {
+                                this.stopAudioRecording();
+                            }
+                        }
+                    };
+                },
+                calculateAmbientNoise(analyser, scriptProcessor, audioContext) {
+                    let measurements = [];
+                    let measureCount = 0;
+                    const measureDuration = 3; // seconds
+
+                    const measureInterval = setInterval(() => {
+                        const array = new Uint8Array(analyser.frequencyBinCount);
+                        analyser.getByteFrequencyData(array);
+                        const average = array.reduce((a, b) => a + b) / array.length;
+                        measurements.push(average);
+                        measureCount += scriptProcessor.bufferSize / audioContext.sampleRate;
+
+                        if (measureCount >= measureDuration) {
+                            clearInterval(measureInterval);
+                            this.ambientNoiseLevel = measurements.reduce((a, b) => a + b) / measurements.length;
+                            this.talkingLevel = this.ambientNoiseLevel + 5;
+                            console.log(`Ambient Noise Level: ${this.ambientNoiseLevel}, Talking Level: ${this.talkingLevel}`);
+                        }
+                    }, scriptProcessor.bufferSize / audioContext.sampleRate * 1000);
+                },
+                startAudioRecording(stream) {
+                    this.isRecording = true;
+                    this.recorder = new MediaRecorder(stream);
+                    this.recorder.ondataavailable = event => {
+                        this.audioChunks.push(event.data);
+                    };
+                    this.recorder.onstop = () => {
+                        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            const base64String = reader.result.split(',')[1];
+                            axios.post('/api/pulse/transcribe', {
+                                user: 'doctor',
+                                audioData: base64String
+                            })
+                            .then(response => {
+                                // const transcriptBox = document.getElementById('transcript-box');
+                                // response.data.output.results.forEach(result => {
+                                //     const transcript = document.createElement('p');
+                                //     transcript.textContent = `Gowajee: ${result.transcript}`;
+                                //     transcriptBox.appendChild(transcript);
+                                // });
+                                console.log('Audio uploaded successfully:', response.data);
+                            })
+                            .catch(error => {
+                                console.error('Error uploading audio:', error);
+                            });
+                        };
+                        this.audioChunks = [];
+                    };
+                    this.recorder.start();
+                },
+                stopAudioRecording() {
+                    this.isRecording = false;
+                    this.recorder.stop();
+                }
+            },
+            mounted() {
+                this.createAndJoinRoom('TestRoom'); // Replace 'defaultRoomName' with your desired room name
+                this.initializeMicrophone();
+            }
+        });
     </script>
 </body>
 </html>
